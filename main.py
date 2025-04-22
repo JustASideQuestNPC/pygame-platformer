@@ -4,6 +4,7 @@ import pygame
 
 import src.engine.input as input
 
+# get configs
 config = ConfigParser()
 config.read('_config.ini')
 
@@ -14,22 +15,60 @@ screen = pygame.display.set_mode((
 ))
 clock = pygame.time.Clock()
 
+# set up input
+input.add_action(
+    name='hold',
+    keys=['a', 'spacebar', 'left mouse'],
+)
+input.add_action(
+    name='hold chord',
+    keys=['b', 'enter', 'right mouse'],
+    chord=True
+)
+input.add_action(
+    name='press',
+    keys=['c', 'left click'],
+    mode='press'
+)
+input.add_action(
+    name='press chord',
+    keys=['shift', 'middle mouse'],
+    mode='press',
+    chord=True
+)
+
+# misc. variables
+dt: float = 0
+""" The time between the last two frames, in seconds. """
+
 # main game loop
 running = True
 while running:
+    dt = clock.tick(60) / 1000 # native delta time is in milliseconds
+
     for event in pygame.event.get():
         # x button or alt+f4 pressed
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.KEYDOWN:
-            print(pygame.key.name(event.key))
+
+    input.update(dt)
 
     # clear the canvas
-    screen.fill("purple")
+    screen.fill("#ffffff")
+
+    c = '#00ff00' if input.active('hold') else '#ff0000'
+    pygame.draw.circle(screen, c, (100, 100), 75)
+
+    c = '#00ff00' if input.active('hold chord') else '#ff0000'
+    pygame.draw.circle(screen, c, (300, 100), 75)
+
+    c = '#00ff00' if input.active('press') else '#ff0000'
+    pygame.draw.circle(screen, c, (100, 300), 75)
+
+    c = '#00ff00' if input.active('press chord') else '#ff0000'
+    pygame.draw.circle(screen, c, (300, 300), 75)
 
     # blit to the screen
     pygame.display.flip()
-
-    clock.tick(60)
 
 pygame.quit()
