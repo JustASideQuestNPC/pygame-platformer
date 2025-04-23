@@ -296,3 +296,6 @@ class Input:
         not considered, but mouse buttons are treated as keyboard input.
         """
         return Input._last_input_source
+    
+    def __new__(cls):
+        raise TypeError('Input is a static class and cannot be instantiated or subclassed.')
