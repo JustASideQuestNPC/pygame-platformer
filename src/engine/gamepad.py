@@ -166,7 +166,7 @@ class Gamepad:
         """ Returns whether the gamepad is connected. """
         return self._pg_joystick != None
     
-    def button_down(self, button: GpButton) -> bool:
+    def button_pressed(self, button: GpButton) -> bool:
         """
         Returns whether a button is currently pressed. If the gamepad is disconnected, this method
         always returns False.
@@ -272,3 +272,13 @@ class Gamepad:
         if v.x != 0 or v.y != 0:
             return v.normalize()
         return v
+    
+    def pressed_buttons(self) -> list[GpButton]:
+        """
+        Returns a list of all buttons that are currently pressed. If the gamepad is disconnected,
+        this method always returns an empty list.
+        """
+        if self._pg_joystick == None:
+            return []
+        
+        return [b for b in GpButton if self.button_pressed(b)]

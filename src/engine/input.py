@@ -4,6 +4,8 @@ from typing import TypedDict, Literal
 
 import pygame
 
+from src.engine.gamepad import Gamepad, GpButton, GpAxis
+
 class ActionData(TypedDict):
     name: str
     keys: list[str]
@@ -35,15 +37,35 @@ _MOUSE_BUTTONS = {
     'mouse 2': 2
 }
 
-_actions: dict[str, '_Action'] = {}
+_GAMEPAD_BUTTONS = {
+    'a': GpButton.A,
+    'b': GpButton.B,
+    'x': GpButton.X,
+    'y': GpButton.Y,
+    'left bumper': GpButton.LEFT_BUMPER,
+    'right bumper': GpButton.RIGHT_BUMPER,
+    'back': GpButton.BACK,
+    'start': GpButton.START,
+    'left stick click': GpButton.LEFT_STICK_CLICK,
+    'right stick click': GpButton.RIGHT_STICK_CLICK,
+    'guide': GpButton.GUIDE,
+    'left trigger': GpButton.LEFT_TRIGGER,
+    'right trigger': GpButton.RIGHT_TRIGGER,
+    'left trigger full pull': GpButton.LEFT_TRIGGER_FULL_PULL,
+    'right trigger full pull': GpButton.RIGHT_TRIGGER_FULL_PULL
+}
 
+_actions: dict[str, '_Action'] = {}
 _buffer_duration: float = 0
+_gamepad = Gamepad()
+_last_input_source: Literal['gamepad', 'keyboard'] = 'keyboard'
 
 class _Action:
     """ Represents a single input action with any number of keyboard keys bound to it. """
 
     __key_codes: list[int]
     __mouse_codes: list[int]
+    __gamepad_codes: list[GpButton]
 
     key_strings: list[str]
     name: str
@@ -55,7 +77,8 @@ class _Action:
     was_active: bool = False
     buffer_remaining: float = 0
 
-    def __init__(self, name: str, keys: list[str], mode: Literal['press', 'hold'], chord: bool):
+    def __init__(self, name: str, keys: list[str], buttons: list[str],
+                 mode: Literal['press', 'hold'], chord: bool):
         self.name = name
         self.key_strings = keys
         self.mode = mode
@@ -64,21 +87,31 @@ class _Action:
         # set key codes - this requires some extra logic because of key aliases
         self.__key_codes = []
         self.__mouse_codes = []
-        for key_name in keys:
-            key_name = key_name.lower()
+        for key in keys:
+            key = key.lower()
 
             # mouse buttons are passed as part of the key list but need to be tracked seperately
-            if key_name in _MOUSE_BUTTONS:
-                self.__mouse_codes.append(_MOUSE_BUTTONS[key_name])
+            if key in _MOUSE_BUTTONS:
+                self.__mouse_codes.append(_MOUSE_BUTTONS[key])
             else:
-                if key_name in _KEY_ALIASES:
-                    key_name = _KEY_ALIASES[key_name]
+                if key in _KEY_ALIASES:
+                    key = _KEY_ALIASES[key]
                 try:
-                    self.__key_codes.append(pygame.key.key_code(key_name))
+                    self.__key_codes.append(pygame.key.key_code(key))
                 except ValueError as e:
                     # re-throw with a better error message
                     if e.args[0] == 'unknown key name':
-                        raise ValueError(f'Invalid key "{key_name}" bound to action "{name}".')
+                        raise ValueError(f'Invalid key "{key}" bound to action "{name}".')
+                    
+        # set gamepad codes
+        self.__gamepad_codes = []
+        for button in buttons:
+            button = button.lower()
+
+            if button in _GAMEPAD_BUTTONS:
+                self.__gamepad_codes.append(_GAMEPAD_BUTTONS[button])
+            else:
+                raise ValueError(f'Invalid gamepad button "{button}" bound to action "{name}".')
                 
     def update(self, key_states: pygame.key.ScancodeWrapper, mouse_states: tuple[bool, bool, bool],
                dt: float):
@@ -86,11 +119,17 @@ class _Action:
 
         keys_pressed: bool = None
         if self.chord:
-            keys_pressed = (all(key_states[k] for k in self.__key_codes)
-                            and all(mouse_states[m] for m in self.__mouse_codes))
+            if _last_input_source == 'gamepad':
+                keys_pressed = all(_gamepad.button_pressed(b) for b in self.__gamepad_codes)
+            else:
+                keys_pressed = (all(key_states[k] for k in self.__key_codes)
+                                and all(mouse_states[m] for m in self.__mouse_codes))
         else:
-            keys_pressed = (any(key_states[k] for k in self.__key_codes)
-                            or any(mouse_states[m] for m in self.__mouse_codes))
+            if _last_input_source == 'gamepad':
+                keys_pressed = any(_gamepad.button_pressed(b) for b in self.__gamepad_codes)
+            else:
+                keys_pressed = (any(key_states[k] for k in self.__key_codes)
+                                or any(mouse_states[m] for m in self.__mouse_codes))
 
         if self.mode == 'hold':
             self.active = keys_pressed
@@ -115,10 +154,13 @@ def get_buffer_duration() -> float:
 
 def set_buffer_duration(duration: float):
     """ Sets how long press-type actions can be buffered for, in seconds. """
+    # i generally don't like using globals, but the other option would be putting everything in a
+    # class and that feels overkill for this
+    global _buffer_duration
     _buffer_duration = duration
 
-def add_action(*, name: str, keys: list[str]=None, mode: Literal['press', 'hold']='hold',
-               chord: bool=False):
+def add_action(*, name: str, keys: list[str]=None, buttons: list[str]=None,
+               mode: Literal['press', 'hold']='hold', chord: bool=False):
     """"
     Adds an action to the manager.
 
@@ -126,8 +168,12 @@ def add_action(*, name: str, keys: list[str]=None, mode: Literal['press', 'hold'
         name (str):
             The name of the action (case-sensitive). If an action with the same name already exists,
             a `ValueError` is thrown.
-        keys (list[str]):
-            All keyboard keys or mouse buttons bound to the action.
+        keys (list[str], optional):
+            All keyboard keys or mouse buttons bound to the action. If an action has no keys and no
+            gamepad buttons bound to it, a `ValueError` is thrown.
+        buttons (list[str], optional):
+            All gamepad buttons bound to the action. If an action has no keys and no gamepad buttons
+            bound to it, a `ValueError` is thrown.
         mode ('press' or 'hold', default='hold'):
             Determines when the action is active. A hold action is active whenever its keys are
             pressed. A press action is active for one frame whenever its keys are pressed, then
@@ -138,13 +184,17 @@ def add_action(*, name: str, keys: list[str]=None, mode: Literal['press', 'hold'
     """
 
     # required because of early binding
-    if keys == None:
-        keys = []
+    if keys == None: keys = []
+    if buttons == None: buttons = []
+
+    if len(keys) == 0 and len(buttons) == 0:
+        raise ValueError(f'The action "{name}" has no keyboard keys, mouse buttons, or gamepad '
+                         'buttons bound to it.')
 
     if name in _actions:
         raise ValueError(f'The action "{name}" already exists.')
     
-    _actions[name] = _Action(name, keys, mode, chord)
+    _actions[name] = _Action(name, keys, buttons, mode, chord)
 
 def update(dt: float):
     """
@@ -154,8 +204,24 @@ def update(dt: float):
         dt (float):
             The time between the last two frames, in seconds.
     """
+
+    # update input source
     key_states = pygame.key.get_pressed()
     mouse_states = pygame.mouse.get_pressed(3)
+
+    # i generally don't like using globals, but the other option would be putting everything in a
+    # class and that feels overkill for this
+    global _last_input_source
+    if not _gamepad.connected():
+        _last_input_source = 'keyboard'
+    # source priority: gamepad buttons, gamepad axes, keyboard keys and mouse buttons
+    elif len(_gamepad.pressed_buttons()) > 0:
+        _last_input_source = 'gamepad'
+    elif any(_gamepad.axis_value(a) != 0 for a in GpAxis):
+        _last_input_source = 'gamepad'
+    elif any(k for k in key_states) or any(m for m in mouse_states):
+        _last_input_source = 'keyboard'    
+
     for action in _actions.values():
         action.update(key_states, mouse_states, dt)
 
@@ -207,3 +273,14 @@ def active(name: str, reset_buffer=True) -> bool:
 def action_names() -> list[str]:
     """ Returns a list with the names of every action. """
     return [k for k in _actions.keys()]
+
+def get_gamepad() -> Gamepad:
+    """ Returns a reference to the gamepad. """
+    return _gamepad
+
+def last_input_source() -> Literal['gamepad', 'keyboard']:
+    """
+    Returns where the last input came from, either 'gamepad' or 'keyboard'. Mouse movement is not
+    considered, but mouse buttons are treated as keyboard input.
+    """
+    return _last_input_source
