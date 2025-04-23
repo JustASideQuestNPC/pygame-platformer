@@ -2,8 +2,8 @@ from configparser import ConfigParser
 
 import pygame
 
-import src.engine.input as input
-from src.engine.gamepad import Gamepad, GpAxis, GpButton, GpThumbstick
+from src.engine.input import Input
+from src.engine.gamepad import Gamepad
 
 # get configs
 config = ConfigParser()
@@ -17,24 +17,24 @@ screen = pygame.display.set_mode((
 clock = pygame.time.Clock()
 
 # set up input
-input.add_action(
+Input.add_action(
     name='hold',
     keys=['a', 'spacebar', 'left mouse'],
     buttons=['a', 'left trigger']
 )
-input.add_action(
+Input.add_action(
     name='hold chord',
     keys=['b', 'right mouse'],
     buttons=['b', 'left trigger full pull'],
     chord=True
 )
-input.add_action(
+Input.add_action(
     name='press',
     keys=['c', 'left click'],
     buttons=['x', 'left stick click'],
     mode='press'
 )
-input.add_action(
+Input.add_action(
     name='press chord',
     keys=['shift', 'middle mouse'],
     buttons=['y', 'right bumper'],
@@ -59,25 +59,25 @@ while running:
         # this does nothing if the event isn't a joystick event
         Gamepad.update_connected(event)
 
-    input.update(dt)
+    Input.update(dt)
 
     # clear the canvas
     screen.fill("#ffffff")
 
-    c = '#00ff00' if input.active('hold') else '#ff0000'
+    c = '#00ff00' if Input.active('hold') else '#ff0000'
     pygame.draw.circle(screen, c, (100, 100), 75)
 
-    c = '#00ff00' if input.active('hold chord') else '#ff0000'
+    c = '#00ff00' if Input.active('hold chord') else '#ff0000'
     pygame.draw.circle(screen, c, (300, 100), 75)
 
-    c = '#00ff00' if input.active('press') else '#ff0000'
+    c = '#00ff00' if Input.active('press') else '#ff0000'
     pygame.draw.circle(screen, c, (100, 300), 75)
 
-    c = '#00ff00' if input.active('press chord') else '#ff0000'
+    c = '#00ff00' if Input.active('press chord') else '#ff0000'
     pygame.draw.circle(screen, c, (300, 300), 75)
 
     text_lines: list[str] = [
-        f'Last input source: {input.last_input_source()}'
+        f'Last input source: {Input.last_input_source()}'
     ]
 
     for [i, line] in enumerate(text_lines):
