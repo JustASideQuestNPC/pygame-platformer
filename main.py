@@ -4,48 +4,33 @@ import pygame
 
 from src.engine.input import Input
 from src.engine.gamepad import Gamepad
+from src.engine.engine import Engine
+from src.entities.test_entities import TestEntity, TestEntityFast
 
 # get configs
 config = ConfigParser()
 config.read('_config.ini')
 
-# pygame setup
+# pygame and engine setup
 pygame.init()
 screen = pygame.display.set_mode((
     int(config['Graphics']['screen_width']), int(config['Graphics']['screen_height'])
 ))
 clock = pygame.time.Clock()
+Engine.init(clock, screen)
 
-# set up input
+# input setup
 Input.add_action(
-    name='hold',
-    keys=['a', 'spacebar', 'left mouse'],
-    buttons=['a', 'left trigger']
+    name='slow time',
+    keys=['left mouse', 'space']
 )
-Input.add_action(
-    name='hold chord',
-    keys=['b', 'right mouse'],
-    buttons=['b', 'left trigger full pull'],
-    chord=True
-)
-Input.add_action(
-    name='press',
-    keys=['c', 'left click'],
-    buttons=['x', 'left stick click'],
-    mode='press'
-)
-Input.add_action(
-    name='press chord',
-    keys=['shift', 'middle mouse'],
-    buttons=['y', 'right bumper'],
-    mode='press',
-    chord=True
-)
+
+Engine.add_entity(TestEntity(screen.get_width() / 2, screen.get_height() / 2))
+Engine.add_entity(TestEntityFast(screen.get_width() / 2, screen.get_height() / 2))
 
 # misc. variables
 dt: float = 0
-""" The time between the last two frames, in seconds. """
-debug_font = pygame.font.SysFont('monospace', 24)
+""" The time between the last two frames in seconds. """
 
 # main game loop
 running = True
@@ -60,28 +45,16 @@ while running:
         Gamepad.update_connected(event)
 
     Input.update(dt)
+    Engine.update()
+
+    if Input.active('slow time'):
+        Engine.time_scale = 0.5
+    else:
+        Engine.time_scale = 1
 
     # clear the canvas
     screen.fill("#ffffff")
-
-    c = '#00ff00' if Input.active('hold') else '#ff0000'
-    pygame.draw.circle(screen, c, (100, 100), 75)
-
-    c = '#00ff00' if Input.active('hold chord') else '#ff0000'
-    pygame.draw.circle(screen, c, (300, 100), 75)
-
-    c = '#00ff00' if Input.active('press') else '#ff0000'
-    pygame.draw.circle(screen, c, (100, 300), 75)
-
-    c = '#00ff00' if Input.active('press chord') else '#ff0000'
-    pygame.draw.circle(screen, c, (300, 300), 75)
-
-    text_lines: list[str] = [
-        f'Last input source: {Input.last_input_source()}'
-    ]
-
-    for [i, line] in enumerate(text_lines):
-        screen.blit(debug_font.render(line, 1, "#000000", "#ffffff"), (420, i * 30 + 10))
+    Engine.render()
 
     # display onscreen
     pygame.display.flip()
