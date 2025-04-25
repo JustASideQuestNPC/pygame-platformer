@@ -1,15 +1,11 @@
-from configparser import ConfigParser
-
 import pygame
+from configobj import ConfigObj
 
 from src.engine.input import Input
 from src.engine.gamepad import Gamepad
 from src.engine.engine import Engine
-from src.entities.test_entities import TestEntity, TestEntityFast
 
-# get configs
-config = ConfigParser()
-config.read('_config.ini')
+config = ConfigObj('_config.ini')
 
 # pygame and engine setup
 pygame.init()
@@ -20,13 +16,15 @@ clock = pygame.time.Clock()
 Engine.init(clock, screen)
 
 # input setup
-Input.add_action(
-    name='slow time',
-    keys=['left mouse', 'space']
-)
-
-Engine.add_entity(TestEntity(screen.get_width() / 2, screen.get_height() / 2))
-Engine.add_entity(TestEntityFast(screen.get_width() / 2, screen.get_height() / 2))
+keybinds = config['Input']['Keybinds']
+press_actions = config['Input']['press-actions']
+for name, bind in keybinds.items():
+    Input.add_action(
+        name=name,
+        keys=bind['keys'],
+        buttons=bind['buttons'],
+        mode='press' if name in press_actions else 'hold'
+    )
 
 # misc. variables
 dt: float = 0
@@ -46,11 +44,6 @@ while running:
 
     Input.update(dt)
     Engine.update()
-
-    if Input.active('slow time'):
-        Engine.time_scale = 0.5
-    else:
-        Engine.time_scale = 1
 
     # clear the canvas
     screen.fill("#ffffff")
