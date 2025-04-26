@@ -10,4 +10,4 @@ class EntityTag(Enum):
     HAS_WALL_COLLISION = 'HAS_WALL_COLLISION'
 
 # physics configs
-GRAVITY = 600 # pixels per second squared
+GRAVITY = 900 # pixels per second squared

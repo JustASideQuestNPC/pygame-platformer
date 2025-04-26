@@ -6,13 +6,13 @@ from src.engine.gamepad import Gamepad
 from src.engine.engine import Engine
 from src.entities.entities import Wall, Player
 
-config = ConfigObj('_config.ini')
+config = ConfigObj('CONFIG.ini')
 
 # pygame and engine setup
 pygame.init()
 screen = pygame.display.set_mode((
     int(config['Graphics']['screen_width']), int(config['Graphics']['screen_height'])
-))
+), flags=pygame.SCALED, vsync=1)
 clock = pygame.time.Clock()
 Engine.init(clock, screen)
 

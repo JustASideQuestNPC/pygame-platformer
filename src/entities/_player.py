@@ -1,5 +1,6 @@
 import pygame
 
+from src.engine.input import Input, GpAxis
 from src.engine.engine import Engine, EntityBase
 from src.engine.colliders import RectCollider
 from src.CONSTANTS import EntityTag, GRAVITY
@@ -11,7 +12,12 @@ class Player(EntityBase):
     # static configs
     COLOR = 0x61aeee
     SIZE = (20, 32) # (width, height)
-    MAX_FALL_SPEED = 600 # pixels per second
+    MAX_FALL_SPEED = 900 # pixels per second
+    # this is a "soft cap" - the player can't normally move faster than this, but they can keep any
+    # speed above it that they get from other sources
+    MAX_RUN_SPEED = 300 # pixels per second
+    JUMP_IMPULSE = -400 # pixels per second
+    MAX_JUMPS = 2
 
     # engine properties
     tags = [EntityTag.PLAYER]
@@ -20,6 +26,7 @@ class Player(EntityBase):
     position: pygame.Vector2
     velocity: pygame.Vector2
     collider: RectCollider
+    jumps_remaining: int
 
     def __init__(self, x: float, y: float):
         super().__init__()
@@ -29,10 +36,32 @@ class Player(EntityBase):
             x - Player.SIZE[0] / 2, y - Player.SIZE[1] / 2,
             Player.SIZE[0], Player.SIZE[1]
         )
+        self.jumps_remaining = 0
 
     def update(self, dt):
-        # apply gravity
-        self.velocity.y = min(self.velocity.y + GRAVITY * dt, Player.MAX_FALL_SPEED)
+        # get movement input
+        move_dir = 0
+        # joysticks take priority
+        if Input.last_input_source() == 'gamepad':
+            stick_pos = Input.get_gamepad().axis_value(GpAxis.LEFT_STICK_X)
+            if stick_pos < -0.5:
+                move_dir = -1
+            elif stick_pos > 0.5:
+                move_dir = 1
+        
+        if move_dir == 0:
+            if Input.active('left'):  move_dir -= 1
+            if Input.active('right'): move_dir += 1
+
+        self.velocity.x = Player.MAX_RUN_SPEED * move_dir
+
+        # jump or apply gravity
+        if self.jumps_remaining > 0 and Input.active('jump'):
+            self.jumps_remaining -= 1
+            # jumping is an impulse, so delta time doesn't affect it
+            self.velocity.y = Player.JUMP_IMPULSE
+        else:
+            self.velocity.y = min(self.velocity.y + GRAVITY * dt, Player.MAX_FALL_SPEED)
 
         # apply delta time and move
         self.position += self.velocity * dt
@@ -53,6 +82,8 @@ class Player(EntityBase):
                     self.velocity.x = 0
                 else: # a translation vector where both components are zero is impossible here
                     self.velocity.y = 0
+                    if trans_vec.y < 0:
+                        self.jumps_remaining = Player.MAX_JUMPS
 
     def render(self, rt):
         pygame.draw.rect(rt, Player.COLOR, self.collider.pg_rect())
