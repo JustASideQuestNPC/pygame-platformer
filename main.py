@@ -4,6 +4,7 @@ from configobj import ConfigObj
 from src.engine.input import Input
 from src.engine.gamepad import Gamepad
 from src.engine.engine import Engine
+from src.entities.entities import Wall, Player
 
 config = ConfigObj('_config.ini')
 
@@ -29,6 +30,9 @@ for name, bind in keybinds.items():
 # misc. variables
 dt: float = 0
 """ The time between the last two frames in seconds. """
+
+Engine.add_entity(Wall(240, 620, 800, 50))
+Engine.add_entity(Player(screen.get_width() / 2, 520))
 
 # main game loop
 running = True

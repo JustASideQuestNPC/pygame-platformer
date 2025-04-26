@@ -4,7 +4,7 @@ from typing import Callable
 import pygame
 
 class EngineTag(Enum):
-    USES_RAW_DELTA_TIME = 0
+    USES_RAW_DELTA_TIME = 'USES_RAW_DELTA_TIME'
     """
     Entities with the `USES_RAW_DELTA_TIME` tag ignore `Engine.time_scale` and always receive the
     "true" delta time in their `update()` methods.
