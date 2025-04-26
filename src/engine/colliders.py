@@ -1,5 +1,4 @@
 import pygame
-from pygame import Vector2
 
 from typing import Self
 
@@ -18,22 +17,28 @@ class RectCollider:
         self.width = width
         self.height = height
 
-    def intersecting(self, other: Self) -> bool:
+    def colliding(self, other: Self, trans_vec: pygame.Vector2=None) -> bool:
         """
         Returns whether this collider intersects with another `RectCollider`.
+
+        Args:
+            trans_vec (pygame.Vector2, optional):
+                Reference to a translation vector. If the colliders intersect, this vector will be
+                set to the smallest vector that moves this collider out of the other one. Otherwise,
+                it will be set to zero.
         """
-        return not (
+        intersecting = not (
             self.x > other.x + other.width or self.x + self.width < other.x or
             self.y > other.y + other.height or self.y + self.height < other.y
         )
-    
-    def collide(self, other: Self) -> Vector2:
-        """
-        Returns a vector that moves this collider out of another `RectCollider`. If the colliders do
-        not overlap, returns a zero vector instead.
-        """
-        if not self.intersecting(other):
-            return Vector2(0, 0)
+
+        # skip everything else if we're not getting a translation vector
+        if trans_vec == None:
+            return intersecting
+        
+        if not intersecting:
+            trans_vec.update(0, 0)
+            return False
         
         # center x and y
         self_cx = self.x + self.width / 2
@@ -53,14 +58,15 @@ class RectCollider:
 
         if mx <= my:
             if dx < 0:
-                return Vector2(mx, 0)
+                trans_vec.update(mx, 0)
             else:
-                return Vector2(-mx, 0)
+                trans_vec.update(-mx, 0)
         else:
             if dy < 0:
-                return Vector2(0, my)
+                trans_vec.update(0, my)
             else:
-                return Vector2(0, -my)
+                trans_vec.update(0, -my)
+        return True
     
     def pg_rect(self) -> pygame.Rect:
         """
